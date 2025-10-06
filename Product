@@ -1,0 +1,226 @@
+import java.util.*;
+
+class Product {
+    private String name;
+    private double basePrice;
+    private boolean isAvailable;
+    private Map<String, Map<String, Integer>> inventory; // Color -> (Size -> Quantity)
+    private Map<String, Double> colorPremium; // Доплата за цвет
+    
+    public Product(String name, double basePrice) {
+        this.name = name;
+        this.basePrice = basePrice;
+        this.isAvailable = true;
+        this.inventory = new HashMap<>();
+        this.colorPremium = new HashMap<>();
+    }
+    
+    public void addInventory(String color, String size, int quantity) {
+        inventory.putIfAbsent(color, new HashMap<>());
+        inventory.get(color).put(size, quantity);
+    }
+    
+    public void setColorPremium(String color, double premium) {
+        colorPremium.put(color, premium);
+    }
+    
+    public boolean checkAvailability(String color, String size) {
+        return inventory.containsKey(color) && 
+               inventory.get(color).containsKey(size) && 
+               inventory.get(color).get(size) > 0;
+    }
+    
+    public double getFinalPrice(String color) {
+        double premium = colorPremium.getOrDefault(color, 0.0);
+        return basePrice + premium;
+    }
+    
+    public void decreaseInventory(String color, String size) {
+        if (checkAvailability(color, size)) {
+            int currentQty = inventory.get(color).get(size);
+            inventory.get(color).put(size, currentQty - 1);
+        }
+    }
+    
+    public String getName() { return name; }
+    public double getBasePrice() { return basePrice; }
+    public boolean isAvailable() { return isAvailable; }
+    public void setAvailable(boolean available) { isAvailable = available; }
+    public Map<String, Map<String, Integer>> getInventory() { return inventory; }
+}
+
+class ShoppingCart {
+    private List<CartItem> items;
+    
+    public ShoppingCart() {
+        this.items = new ArrayList<>();
+    }
+    
+    public void addItem(Product product, String color, String size) {
+        if (product.checkAvailability(color, size)) {
+            items.add(new CartItem(product, color, size));
+            product.decreaseInventory(color, size);
+            System.out.println("✅ Товар добавлен в корзину!");
+        } else {
+            System.out.println("❌ Не удалось добавить товар в корзину");
+        }
+    }
+    
+    public void displayCart() {
+        System.out.println("\n=== ВАША КОРЗИНА ===");
+        if (items.isEmpty()) {
+            System.out.println("Корзина пуста");
+            return;
+        }
+        
+        double total = 0;
+        for (int i = 0; i < items.size(); i++) {
+            CartItem item = items.get(i);
+            double price = item.getProduct().getFinalPrice(item.getColor());
+            System.out.printf("%d. %s - %s/%s - %.2f руб.\n", 
+                i + 1, item.getProduct().getName(), item.getColor(), item.getSize(), price);
+            total += price;
+        }
+        System.out.printf("ИТОГО: %.2f руб.\n", total);
+    }
+}
+
+class CartItem {
+    private Product product;
+    private String color;
+    private String size;
+    
+    public CartItem(Product product, String color, String size) {
+        this.product = product;
+        this.color = color;
+        this.size = size;
+    }
+    
+    public Product getProduct() { return product; }
+    public String getColor() { return color; }
+    public String getSize() { return size; }
+}
+
+public class OnlineClothingStore {
+    private Scanner scanner;
+    private Product currentProduct;
+    private ShoppingCart cart;
+    
+    public OnlineClothingStore() {
+        this.scanner = new Scanner(System.in);
+        this.cart = new ShoppingCart();
+        initializeSampleProduct();
+    }
+    
+    private void initializeSampleProduct() {
+
+        currentProduct = new Product("Футболка Premium", 1999.99);
+        
+
+        currentProduct.addInventory("черный", "S", 5);
+        currentProduct.addInventory("черный", "M", 3);
+        currentProduct.addInventory("черный", "L", 0);
+        currentProduct.addInventory("белый", "S", 2);
+        currentProduct.addInventory("белый", "M", 4);
+        currentProduct.addInventory("синий", "M", 1);
+        
+        // Устанавливаем доплаты за цвета
+        currentProduct.setColorPremium("синий", 300.0);
+    }
+    
+    public void startShopping() {
+        System.out.println("=== ОНЛАЙН МАГАЗИН ОДЕЖДЫ ===\n");
+        
+        if (!currentProduct.isAvailable()) {
+            System.out.println("❌ Товар недоступен для заказа");
+            return;
+        }
+        
+        displayProductInfo();
+        
+        String selectedColor = selectColor();
+        if (selectedColor == null) return;
+        
+        String selectedSize = selectSize(selectedColor);
+        if (selectedSize == null) return;
+        
+        checkAvailabilityAndPrice(selectedColor, selectedSize);
+        
+        addToCart(selectedColor, selectedSize);
+        
+        cart.displayCart();
+        
+        scanner.close();
+    }
+    
+    private void displayProductInfo() {
+        System.out.printf("Товар: %s\n", currentProduct.getName());
+        System.out.printf("Базовая цена: %.2f руб.\n", currentProduct.getBasePrice());
+        System.out.println("Доступные цвета: черный, белый, синий");
+    }
+    
+    private String selectColor() {
+        System.out.print("\nВыберите цвет (черный/белый/синий): ");
+        String color = scanner.nextLine().toLowerCase();
+        
+        if (!currentProduct.getInventory().containsKey(color)) {
+            System.out.println("❌ Выбранный цвет недоступен");
+            return null;
+        }
+        
+        System.out.printf("✅ Выбран цвет: %s\n", color);
+        return color;
+    }
+    
+    private String selectSize(String color) {
+        System.out.println("\nДоступные размеры для цвета " + color + ":");
+        Map<String, Integer> sizes = currentProduct.getInventory().get(color);
+        for (Map.Entry<String, Integer> entry : sizes.entrySet()) {
+            String status = entry.getValue() > 0 ? "✓ в наличии" : "✗ нет в наличии";
+            System.out.printf(" %s - %s\n", entry.getKey(), status);
+        }
+        
+        System.out.print("Выберите размер: ");
+        String size = scanner.nextLine().toUpperCase();
+        
+        if (!sizes.containsKey(size)) {
+            System.out.println("❌ Выбранный размер недоступен для этого цвета");
+            return null;
+        }
+        
+        return size;
+    }
+    
+    private void checkAvailabilityAndPrice(String color, String size) {
+        System.out.println("\n=== ПРОВЕРКА НАЛИЧИЯ ===");
+        
+        if (currentProduct.checkAvailability(color, size)) {
+            double finalPrice = currentProduct.getFinalPrice(color);
+            System.out.println("✅ Товар в наличии!");
+            System.out.printf("Окончательная цена: %.2f руб.\n", finalPrice);
+        } else {
+            System.out.println("❌ Выбранный вариант отсутствует на складе");
+        }
+    }
+    
+    private void addToCart(String color, String size) {
+        if (!currentProduct.checkAvailability(color, size)) {
+            System.out.println("❌ Невозможно добавить товар в корзину - нет в наличии");
+            return;
+        }
+        
+        System.out.print("\nДобавить товар в корзину? (да/нет): ");
+        String answer = scanner.nextLine().toLowerCase();
+        
+        if (answer.equals("да") || answer.equals("yes") || answer.equals("y")) {
+            cart.addItem(currentProduct, color, size);
+        } else {
+            System.out.println("Товар не добавлен в корзину");
+        }
+    }
+    
+    public static void main(String[] args) {
+        OnlineClothingStore store = new OnlineClothingStore();
+        store.startShopping();
+    }
+}
